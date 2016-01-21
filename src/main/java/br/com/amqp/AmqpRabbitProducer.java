@@ -1,14 +1,14 @@
-package br.com.pexin.amqp;
+package br.com.amqp;
 
-import br.com.pexin.amqp.annotation.AmqpExchange;
-import br.com.pexin.amqp.annotation.AmqpExchangeType;
-import br.com.pexin.amqp.annotation.AmqpProducer;
-import br.com.pexin.amqp.annotation.AmqpQueue;
-import br.com.pexin.amqp.deployer.AmqpRabbitDeployer;
-import br.com.pexin.amqp.factory.AmqpExchangeFactory;
-import br.com.pexin.amqp.factory.AmqpQueueFactory;
-import br.com.pexin.amqp.post.processor.DefaultMessagePostProcessor;
-import br.com.pexin.amqp.post.processor.DelayedMessagePostProcessor;
+import br.com.amqp.annotation.AmqpExchange;
+import br.com.amqp.factory.AmqpExchangeFactory;
+import br.com.amqp.annotation.AmqpExchangeType;
+import br.com.amqp.annotation.AmqpProducer;
+import br.com.amqp.annotation.AmqpQueue;
+import br.com.amqp.deployer.AmqpRabbitDeployer;
+import br.com.amqp.factory.AmqpQueueFactory;
+import br.com.amqp.post.processor.DefaultMessagePostProcessor;
+import br.com.amqp.post.processor.DelayedMessagePostProcessor;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpIOException;

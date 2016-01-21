@@ -1,10 +1,10 @@
-package br.com.pexin.amqp;
+package br.com.amqp;
 
-import br.com.pexin.amqp.annotation.AmqpConsumer;
-import br.com.pexin.amqp.annotation.AmqpQueue;
-import br.com.pexin.amqp.annotation.AmqpRetryPolicy;
-import br.com.pexin.amqp.executor.ScheduleMessageListenerExecutor;
-import br.com.pexin.amqp.factory.AmqpExchangeFactory;
+import br.com.amqp.annotation.AmqpQueue;
+import br.com.amqp.annotation.AmqpRetryPolicy;
+import br.com.amqp.factory.AmqpExchangeFactory;
+import br.com.amqp.annotation.AmqpConsumer;
+import br.com.amqp.executor.ScheduleMessageListenerExecutor;
 import com.rabbitmq.client.Channel;
 import org.aopalliance.aop.Advice;
 import org.springframework.amqp.AmqpException;

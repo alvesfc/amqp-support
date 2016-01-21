@@ -1,4 +1,4 @@
-package br.com.pexin.amqp.executor;
+package br.com.amqp.executor;
 
 public class ScheduleMessageListenerTask implements Runnable {
 

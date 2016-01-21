@@ -1,8 +1,8 @@
-package br.com.pexin.amqp.factory;
+package br.com.amqp.factory;
 
-import br.com.pexin.amqp.annotation.AmqpExchange;
-import br.com.pexin.amqp.annotation.AmqpExchangeType;
-import br.com.pexin.amqp.annotation.AmqpProducer;
+import br.com.amqp.annotation.AmqpExchange;
+import br.com.amqp.annotation.AmqpExchangeType;
+import br.com.amqp.annotation.AmqpProducer;
 import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Exchange;
 import org.springframework.amqp.core.TopicExchange;

@@ -1,4 +1,4 @@
-package br.com.pexin.amqp.annotation;
+package br.com.amqp.annotation;
 
 import org.springframework.stereotype.Component;
 

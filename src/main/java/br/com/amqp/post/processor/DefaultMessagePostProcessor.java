@@ -1,4 +1,4 @@
-package br.com.pexin.amqp.post.processor;
+package br.com.amqp.post.processor;
 
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;

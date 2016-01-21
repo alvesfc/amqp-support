@@ -1,7 +1,7 @@
-package br.com.pexin.amqp.factory;
+package br.com.amqp.factory;
 
-import br.com.pexin.amqp.annotation.AmqpExchange;
-import br.com.pexin.amqp.annotation.AmqpQueue;
+import br.com.amqp.annotation.AmqpExchange;
+import br.com.amqp.annotation.AmqpQueue;
 import org.springframework.amqp.core.Queue;
 
 import java.util.HashMap;

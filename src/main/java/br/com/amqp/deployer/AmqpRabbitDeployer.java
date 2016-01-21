@@ -1,4 +1,4 @@
-package br.com.pexin.amqp.deployer;
+package br.com.amqp.deployer;
 
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
