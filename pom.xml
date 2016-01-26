@@ -15,6 +15,12 @@
 
     <dependencies>
 
+        <!-- Pexin -->
+        <dependency>
+            <groupId>br.com.pexin</groupId>
+            <artifactId>common-features</artifactId>
+        </dependency>
+
         <!-- Spring Boot Core -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

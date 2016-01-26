@@ -1,19 +1,20 @@
-package br.com.amqp;
+package br.com.pexin.amqp;
 
-import br.com.amqp.annotation.AmqpQueue;
-import br.com.amqp.annotation.AmqpRetryPolicy;
-import br.com.amqp.factory.AmqpExchangeFactory;
-import br.com.amqp.annotation.AmqpConsumer;
-import br.com.amqp.executor.ScheduleMessageListenerExecutor;
+import br.com.pexin.amqp.annotation.AmqpConsumer;
+import br.com.pexin.amqp.annotation.AmqpQueue;
+import br.com.pexin.amqp.annotation.AmqpRetryPolicy;
+import br.com.pexin.amqp.executor.ScheduleMessageListenerExecutor;
+import br.com.pexin.amqp.factory.AmqpExchangeFactory;
+import br.com.pexin.log.FluentLogger;
 import com.rabbitmq.client.Channel;
 import org.aopalliance.aop.Advice;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpException;
-import org.springframework.amqp.core.AcknowledgeMode;
-import org.springframework.amqp.core.Address;
-import org.springframework.amqp.core.Message;
-import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.AmqpIOException;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.amqp.rabbit.retry.RepublishMessageRecoverer;
@@ -24,10 +25,10 @@ import org.springframework.retry.backoff.ExponentialBackOffPolicy;
 import org.springframework.retry.interceptor.RetryOperationsInterceptor;
 import org.springframework.retry.policy.SimpleRetryPolicy;
 import org.springframework.retry.support.RetryTemplate;
-import org.springframework.util.ErrorHandler;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
+import java.util.Properties;
 
 /**
  * Created by rafaelfirmino on 20/01/16.
@@ -36,8 +37,11 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
+    @Autowired
+    private RabbitAdmin rabbitAdmin;
 
     private AmqpConsumer amqpConsumerMetadata;
+    private FluentLogger fluentLogger = new FluentLogger(LogFactory.getLog(getClass()));
 
     private static final int TASK_EXECUTOR_RETRY_INTERVAL = 30000;
     private static final int RECOVERY_INTERVAL = 1000;
@@ -50,6 +54,7 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
         try{
 
             populateAmqpConsumerMetadata();
+            createQueueIfNecessary();
 
             setTaskExecutor(new ScheduleMessageListenerExecutor(TASK_EXECUTOR_RETRY_INTERVAL));
             setConnectionFactory(rabbitTemplate.getConnectionFactory());
@@ -65,13 +70,13 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
             setAdviceChain(new Advice[] {
                     workMessagesRetryInterceptor()
             });
-            setErrorHandler(new ErrorHandler() {
-                @Override
-                public void handleError(Throwable t) {
-                    logger.error(t);
-                }
-            });
-
+            setErrorHandler(t -> fluentLogger
+                            .key("setUp")
+                            .value("errorHandler")
+                            .key("cause")
+                            .value(t.getMessage())
+                            .logError()
+            );
         }catch (Exception e){
             throw new IllegalStateException(e);
         }
@@ -85,9 +90,19 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
             final R response = this.onMessage(messageConverted);
             sendReplyMessage(message, channel, response);
         }catch (ClassCastException | MessageConversionException | IllegalArgumentException | NullPointerException e){
-            logger.warn("Message rejected from special excetions. " + message);
+            fluentLogger
+                    .key("method")
+                    .value("onMessage")
+                    .key("cause")
+                    .value("Message rejected from special excetions. " + message)
+                    .logWarn();
         }catch (Exception e){
-            logger.warn("Message with error in consumer. Throw AmqpException to retry. " + message);
+            fluentLogger
+                    .key("method")
+                    .value("onMessage")
+                    .key("cause")
+                    .value("Message with error in consumer. Throw AmqpException to retry. " + message)
+                    .logWarn();
             throw new AmqpException(e);
         }
     }
@@ -123,8 +138,14 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
             try {
                 publishReply(channel, replyToAddress, responseMessage);
             } catch (IOException ex) {
-                final String error = String.format("error=\"Unexpected Error when publishing reply\" cause=%s message=%s", message, ex.getMessage());
-                logger.error(error);
+                fluentLogger
+                        .key("method")
+                        .value("sendReplyMessage")
+                        .key("message")
+                        .value(message)
+                        .key("cause")
+                        .value(ex.getMessage())
+                        .logError();
             }
         }
     }
@@ -166,6 +187,27 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
                 .retryOperations(template)
                 .recoverer(new RepublishMessageRecoverer(rabbitTemplate, exchangeName, exchangeDlqRoutingKey))
                 .build();
+    }
+
+    private void createQueueIfNecessary() {
+        if(!hasQueueDeployed(retrieveAmqpQueue())){
+            final Queue queue = new Queue(retrieveAmqpQueue().name());
+            try {
+                rabbitAdmin.declareQueue(queue);
+            } catch (AmqpIOException ex) {
+                fluentLogger
+                        .key("method")
+                        .value("createQueueIfNecessary")
+                        .key("cause")
+                        .value("Error in creating new queue on consumer..." + ex.getMessage())
+                        .logWarn();
+            }
+        }
+    }
+
+    private boolean hasQueueDeployed(AmqpQueue amqpQueue) {
+        final Properties properties = rabbitAdmin.getQueueProperties(amqpQueue.name());
+        return properties != null;
     }
 
     public abstract R onMessage(T message);

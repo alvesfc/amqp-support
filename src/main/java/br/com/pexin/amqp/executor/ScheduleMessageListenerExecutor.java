@@ -1,7 +1,7 @@
 /**
  * 
  */
-package br.com.amqp.executor;
+package br.com.pexin.amqp.executor;
 
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 

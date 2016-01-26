@@ -1,4 +1,4 @@
-package br.com.amqp.annotation;
+package br.com.pexin.amqp.annotation;
 
 /**
  * Created by rafaelfirmino on 20/01/16.

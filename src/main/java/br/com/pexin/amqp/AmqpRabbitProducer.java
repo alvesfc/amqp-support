@@ -1,15 +1,15 @@
-package br.com.amqp;
+package br.com.pexin.amqp;
 
-import br.com.amqp.annotation.AmqpExchange;
-import br.com.amqp.factory.AmqpExchangeFactory;
-import br.com.amqp.annotation.AmqpExchangeType;
-import br.com.amqp.annotation.AmqpProducer;
-import br.com.amqp.annotation.AmqpQueue;
-import br.com.amqp.deployer.AmqpRabbitDeployer;
-import br.com.amqp.factory.AmqpQueueFactory;
-import br.com.amqp.post.processor.DefaultMessagePostProcessor;
-import br.com.amqp.post.processor.DelayedMessagePostProcessor;
-import org.apache.commons.logging.Log;
+import br.com.pexin.amqp.annotation.AmqpExchange;
+import br.com.pexin.amqp.annotation.AmqpExchangeType;
+import br.com.pexin.amqp.annotation.AmqpProducer;
+import br.com.pexin.amqp.annotation.AmqpQueue;
+import br.com.pexin.amqp.deployer.AmqpRabbitDeployer;
+import br.com.pexin.amqp.factory.AmqpExchangeFactory;
+import br.com.pexin.amqp.factory.AmqpQueueFactory;
+import br.com.pexin.amqp.post_processor.DefaultMessagePostProcessor;
+import br.com.pexin.amqp.post_processor.DelayedMessagePostProcessor;
+import br.com.pexin.log.FluentLogger;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpIOException;
 import org.springframework.amqp.core.*;
@@ -34,8 +34,7 @@ public abstract class AmqpRabbitProducer<T> {
     private RabbitAdmin rabbitAdmin;
 
     private AmqpProducer amqpProducerMetadata;
-
-    private final Log logger = LogFactory.getLog(getClass());
+    private FluentLogger fluentLogger = new FluentLogger(LogFactory.getLog(getClass()));
 
     @PostConstruct
     private void setUp(){
@@ -162,7 +161,14 @@ public abstract class AmqpRabbitProducer<T> {
         try {
             rabbitAdmin.declareQueue(queue);
         } catch (AmqpIOException ex) {
-            logger.info("Starting the deployment of queue " + queue.getName() + " with a new configuration. Reason of Deploy: " + ex.getCause().getCause());
+            fluentLogger
+                    .key("method")
+                    .value("declareQueue")
+                    .key("cause")
+                    .value("Starting the deployment of queue " + queue.getName() + " with a new configuration.")
+                    .key("reason_deploy")
+                    .value(ex.getCause().getCause())
+                    .logInfo();
             new AmqpRabbitDeployer(rabbitAdmin, rabbitTemplate)
                     .deployQueueWithNewConfiguration(queue);
         }
