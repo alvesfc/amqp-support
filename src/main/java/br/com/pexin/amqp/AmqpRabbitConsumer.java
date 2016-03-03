@@ -5,7 +5,7 @@ import br.com.pexin.amqp.annotation.AmqpQueue;
 import br.com.pexin.amqp.annotation.AmqpRetryPolicy;
 import br.com.pexin.amqp.executor.ScheduleMessageListenerExecutor;
 import br.com.pexin.amqp.factory.AmqpExchangeFactory;
-import br.com.pexin.log.FluentLogger;
+import br.com.pexin.amqp.log.FluentLogger;
 import com.rabbitmq.client.Channel;
 import org.aopalliance.aop.Advice;
 import org.apache.commons.logging.LogFactory;
