@@ -14,6 +14,10 @@ public class AmqpQueueFactory {
 
     private final static String DLQ_EXCHANGE = "x-dead-letter-exchange";
     private final static String DLQ_ROUTING_KEY = "x-dead-letter-routing-key";
+    public static final String SEPARATOR = ".";
+    public static final String QUEUE_POSTFIX = "queue";
+    public static final String DLQ_POSTFIX = "dlq";
+    public static final String WAITING_POSTFIX = "waiting";
 
     public static Map<String, Object> retrieveArgsFromQueue(final AmqpQueue amqpQueue) {
         return new HashMap<String, Object>() {
@@ -35,19 +39,20 @@ public class AmqpQueueFactory {
     }
 
     public static String retrieveQueueName(final AmqpQueue amqpQueue) {
-        return new StringBuilder(amqpQueue.name()).append(".").append("queue").toString();
+        return new StringBuilder(amqpQueue.name()).append(SEPARATOR).append(QUEUE_POSTFIX).toString();
     }
 
     public static String retrieveDlqQueueName(final AmqpQueue amqpQueue) {
-        return new StringBuilder(retrieveQueueName(amqpQueue)).append(".").append("dlq").toString();
+        return new StringBuilder(retrieveQueueName(amqpQueue)).append(SEPARATOR).append(DLQ_POSTFIX).toString();
     }
 
     public static String retrieveWaitingQueueName(final AmqpQueue amqpQueue) {
-        return new StringBuilder(retrieveQueueName(amqpQueue)).append(".").append("waiting").toString();
+        return new StringBuilder(retrieveQueueName(amqpQueue)).append(SEPARATOR).append(WAITING_POSTFIX).toString();
     }
 
     public static Queue createQueue(final AmqpQueue amqpQueue) {
-        return new Queue(retrieveQueueName(amqpQueue), amqpQueue.durable(), amqpQueue.exclusive(), amqpQueue.autoDelete(),
+        return new Queue(retrieveQueueName(amqpQueue), amqpQueue.durable(), amqpQueue.exclusive(),
+                amqpQueue.autoDelete(),
                 AmqpQueueFactory.retrieveArgsFromQueue(amqpQueue));
     }
 
