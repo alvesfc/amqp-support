@@ -10,11 +10,13 @@ import br.com.pexin.amqp.factory.AmqpQueueFactory;
 import br.com.pexin.amqp.log.FluentLogger;
 import br.com.pexin.amqp.post_processor.DefaultMessagePostProcessor;
 import br.com.pexin.amqp.post_processor.DelayedMessagePostProcessor;
+import br.com.pexin.amqp.post_processor.PersistenceMessagePostProcessor;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpIOException;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -116,14 +118,21 @@ public abstract class AmqpRabbitProducer<T> {
         return amqpProducerMetadata.delayTimeInMillis() > 0;
     }
 
+    private boolean hasDeliveryModePersistence() {
+        return MessageDeliveryMode.PERSISTENT.equals(amqpProducerMetadata.deliveryMode());
+    }
+
     private boolean isTopic() {
         return AmqpExchangeType.TOPIC.equals(retrieveAmqpExchange().amqpExchangeType());
     }
 
     private MessagePostProcessor retrieveMessagePostProcessor(final T message) {
         MessagePostProcessor messagePostProcessor = new DefaultMessagePostProcessor(message);
+
         if (hasDelay()) {
             messagePostProcessor = new DelayedMessagePostProcessor(amqpProducerMetadata.delayTimeInMillis());
+        } else if (hasDeliveryModePersistence()) {
+            messagePostProcessor = new PersistenceMessagePostProcessor(amqpProducerMetadata.deliveryMode());
         }
         return messagePostProcessor;
     }

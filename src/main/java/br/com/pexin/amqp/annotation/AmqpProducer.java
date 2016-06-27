@@ -1,5 +1,6 @@
 package br.com.pexin.amqp.annotation;
 
+import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.stereotype.Component;
 
 import java.lang.annotation.Documented;
@@ -26,13 +27,23 @@ public @interface AmqpProducer {
     int delayTimeInMillis() default 0;
 
     /**
+     * Determina o modo de entrga da mensagem.
+     * Caso não seja informado , será NON_PERSISTENT
+     *
+     * @return {@link MessageDeliveryMode} com o modo de entrga.
+     */
+    MessageDeliveryMode deliveryMode() default MessageDeliveryMode.NON_PERSISTENT;
+
+    /**
      * Fila que será enviada a mensagem.
+     *
      * @return {@link AmqpQueue} com a configuração da fila.
      */
     AmqpQueue amqpQueue();
 
     /**
      * Exchange que será utilizado para envio da mensagem.
+     *
      * @return {@link AmqpExchange} com a configuração do Exchange.
      */
     AmqpExchange amqpExchange() default @AmqpExchange;
