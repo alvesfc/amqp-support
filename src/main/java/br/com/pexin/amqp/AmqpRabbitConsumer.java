@@ -1,17 +1,21 @@
 package br.com.pexin.amqp;
 
 import br.com.pexin.amqp.annotation.AmqpConsumer;
-import br.com.pexin.amqp.annotation.AmqpQueue;
 import br.com.pexin.amqp.annotation.AmqpRetryPolicy;
 import br.com.pexin.amqp.executor.ScheduleMessageListenerExecutor;
 import br.com.pexin.amqp.factory.AmqpExchangeFactory;
+import br.com.pexin.amqp.factory.AmqpQueueFactory;
 import br.com.pexin.amqp.log.FluentLogger;
 import com.rabbitmq.client.Channel;
 import org.aopalliance.aop.Advice;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.AmqpIOException;
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.AcknowledgeMode;
+import org.springframework.amqp.core.Address;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.config.RetryInterceptorBuilder;
 import org.springframework.amqp.rabbit.core.ChannelAwareMessageListener;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -33,7 +37,8 @@ import java.util.Properties;
 /**
  * Created by rafaelfirmino on 20/01/16.
  */
-public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerContainer implements ChannelAwareMessageListener {
+public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerContainer
+        implements ChannelAwareMessageListener {
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -50,8 +55,8 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
     private static final int PREFETCH_COUNT = 1;
 
     @PostConstruct
-    private void setUp(){
-        try{
+    private void setUp() {
+        try {
 
             populateAmqpConsumerMetadata();
             createQueueIfNecessary();
@@ -71,13 +76,13 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
                     workMessagesRetryInterceptor()
             });
             setErrorHandler(t -> fluentLogger
-                            .key("setUp")
-                            .value("errorHandler")
-                            .key("cause")
-                            .value(t.getMessage())
-                            .logError()
+                    .key("setUp")
+                    .value("errorHandler")
+                    .key("cause")
+                    .value(t.getMessage())
+                    .logError()
             );
-        }catch (Exception e){
+        } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
@@ -89,14 +94,14 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
             final T messageConverted = convertMessage(message);
             final R response = this.onMessage(messageConverted);
             sendReplyMessage(message, channel, response);
-        }catch (ClassCastException | MessageConversionException | IllegalArgumentException | NullPointerException e){
+        } catch (ClassCastException | MessageConversionException | IllegalArgumentException | NullPointerException e) {
             fluentLogger
                     .key("method")
                     .value("onMessage")
                     .key("cause")
                     .value("Message rejected from special excetions. " + message)
                     .logWarn();
-        }catch (Exception e){
+        } catch (Exception e) {
             fluentLogger
                     .key("method")
                     .value("onMessage")
@@ -112,14 +117,10 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
     }
 
     private String retrieveQueueName() {
-        return retrieveAmqpQueue().name();
+        return AmqpQueueFactory.retrieveQueueName(amqpConsumerMetadata.amqpQueue());
     }
 
-    private AmqpQueue retrieveAmqpQueue(){
-        return amqpConsumerMetadata.amqpQueue();
-    }
-
-    private AmqpRetryPolicy retrieveAmqpRetryPolicy(){
+    private AmqpRetryPolicy retrieveAmqpRetryPolicy() {
         return amqpConsumerMetadata.amqpRetryPolicy();
     }
 
@@ -150,10 +151,12 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
         }
     }
 
-    private void publishReply(final Channel channel, final Address replyToAddress, final Message responseMessage) throws IOException {
+    private void publishReply(final Channel channel, final Address replyToAddress, final Message responseMessage)
+            throws IOException {
         channel.basicPublish(replyToAddress.getExchangeName(),
                 replyToAddress.getRoutingKey(),
-                new DefaultMessagePropertiesConverter().fromMessageProperties(responseMessage.getMessageProperties(), "UTF-8"),
+                new DefaultMessagePropertiesConverter()
+                        .fromMessageProperties(responseMessage.getMessageProperties(), "UTF-8"),
                 responseMessage.getBody());
     }
 
@@ -190,8 +193,8 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
     }
 
     private void createQueueIfNecessary() {
-        if(!hasQueueDeployed(retrieveAmqpQueue())){
-            final Queue queue = new Queue(retrieveAmqpQueue().name());
+        if (!hasQueueDeployed(retrieveQueueName())) {
+            final Queue queue = new Queue(retrieveQueueName());
             try {
                 rabbitAdmin.declareQueue(queue);
             } catch (AmqpIOException ex) {
@@ -205,8 +208,8 @@ public abstract class AmqpRabbitConsumer<T, R> extends SimpleMessageListenerCont
         }
     }
 
-    private boolean hasQueueDeployed(AmqpQueue amqpQueue) {
-        final Properties properties = rabbitAdmin.getQueueProperties(amqpQueue.name());
+    private boolean hasQueueDeployed(String queueName) {
+        final Properties properties = rabbitAdmin.getQueueProperties(queueName);
         return properties != null;
     }
 

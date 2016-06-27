@@ -12,7 +12,11 @@ import br.com.pexin.amqp.post_processor.DefaultMessagePostProcessor;
 import br.com.pexin.amqp.post_processor.DelayedMessagePostProcessor;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.amqp.AmqpIOException;
-import org.springframework.amqp.core.*;
+import org.springframework.amqp.core.Binding;
+import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.Exchange;
+import org.springframework.amqp.core.MessagePostProcessor;
+import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,59 +41,63 @@ public abstract class AmqpRabbitProducer<T> {
     private FluentLogger fluentLogger = new FluentLogger(LogFactory.getLog(getClass()));
 
     @PostConstruct
-    private void setUp(){
+    private void setUp() {
 
         populateAmqpProducerMetadata();
 
-        switch (retrieveAmqpExchange().amqpExchangeType()){
-            case DIRECT:
+        switch (retrieveAmqpExchange().amqpExchangeType()) {
+        case DIRECT:
 
-                final Exchange exchange = createExchange();
-                final Exchange exchangeDlq = createDlqExchange();
-                final Queue queue = createOrReplaceQueue();
-                final Queue dlqQueue = createOrReplaceDlqQueue();
-                final Queue waitingQueue = createOrReplaceWaitingQueue();
-                final List<Binding> bindings = doBindings(exchange, exchangeDlq, queue, dlqQueue, waitingQueue);
-                declare(exchange, exchangeDlq, queue, dlqQueue, waitingQueue, bindings);
+            final Exchange exchange = createExchange();
+            final Exchange exchangeDlq = createDlqExchange();
+            final Queue queue = createOrReplaceQueue();
+            final Queue dlqQueue = createOrReplaceDlqQueue();
+            final Queue waitingQueue = createOrReplaceWaitingQueue();
+            final List<Binding> bindings = doBindings(exchange, exchangeDlq, queue, dlqQueue, waitingQueue);
+            declare(exchange, exchangeDlq, queue, dlqQueue, waitingQueue, bindings);
 
-                return;
+            return;
 
-            case TOPIC:
+        case TOPIC:
 
-                final List<String> queueNamesToTopic = retrieveQueueNames();
-                final Exchange exchangeTopic = createExchange();
-                final List<Binding> bindingsToTopic = doBindingsToTopic(exchangeTopic, queueNamesToTopic);
-                declare(exchangeTopic, bindingsToTopic);
+            final List<String> queueNamesToTopic = retrieveQueueNames();
+            final Exchange exchangeTopic = createExchange();
+            final List<Binding> bindingsToTopic = doBindingsToTopic(exchangeTopic, queueNamesToTopic);
+            declare(exchangeTopic, bindingsToTopic);
 
-                return;
+            return;
         }
     }
 
-    public void sendMessage(final T message){
+    public void sendMessage(final T message) {
         beforeSend(message);
         rabbitTemplate.convertAndSend(
-                AmqpExchangeFactory.retrieveExchangeName(retrieveAmqpQueue().name(), amqpProducerMetadata.amqpExchange().amqpExchangeType()),
+                AmqpExchangeFactory.retrieveExchangeName(AmqpQueueFactory.retrieveQueueName(retrieveAmqpQueue()),
+                        amqpProducerMetadata.amqpExchange().amqpExchangeType()),
                 retrieveExchangeRoutingKeyToSend(),
                 message,
                 retrieveMessagePostProcessor(message));
         afterSend(message);
     }
 
-    public <R> R sendSyncMessage(final T message, final Class<R> responseClazz){
+    public <R> R sendSyncMessage(final T message, final Class<R> responseClazz) {
 
-        if(isTopic()){
+        if (isTopic()) {
             throw new RuntimeException("Topics cant send synchronous messages.");
         }
 
         beforeSend(message);
         R response = responseClazz
-                        .cast(
-                            rabbitTemplate.convertSendAndReceive(
-                            AmqpExchangeFactory.retrieveExchangeName(retrieveAmqpQueue().name(), amqpProducerMetadata.amqpExchange().amqpExchangeType()),
-                            AmqpExchangeFactory.retrieveExchangeRoutingKey(retrieveAmqpQueue().name()),
-                            message
+                .cast(
+                        rabbitTemplate.convertSendAndReceive(
+                                AmqpExchangeFactory
+                                        .retrieveExchangeName(AmqpQueueFactory.retrieveQueueName(retrieveAmqpQueue()),
+                                                amqpProducerMetadata.amqpExchange().amqpExchangeType()),
+                                AmqpExchangeFactory.retrieveExchangeRoutingKey(
+                                        AmqpQueueFactory.retrieveQueueName(retrieveAmqpQueue())),
+                                message
                         )
-        );
+                );
         afterSend(message);
 
         return response;
@@ -97,21 +105,24 @@ public abstract class AmqpRabbitProducer<T> {
 
     private String retrieveExchangeRoutingKeyToSend() {
         return isTopic() ? AmqpExchangeFactory.retrieveExchangeRoutingKeyGenericToTopic() :
-                hasDelay() ? AmqpExchangeFactory.retrieveExchangeWaitingRoutingKey(retrieveAmqpQueue().name()) :
-                        AmqpExchangeFactory.retrieveExchangeRoutingKey(retrieveAmqpQueue().name());
+                hasDelay() ?
+                        AmqpExchangeFactory.retrieveExchangeWaitingRoutingKey(
+                                AmqpQueueFactory.retrieveQueueName(retrieveAmqpQueue())) :
+                        AmqpExchangeFactory
+                                .retrieveExchangeRoutingKey(AmqpQueueFactory.retrieveQueueName(retrieveAmqpQueue()));
     }
 
-    private boolean hasDelay(){
+    private boolean hasDelay() {
         return amqpProducerMetadata.delayTimeInMillis() > 0;
     }
 
-    private boolean isTopic(){
+    private boolean isTopic() {
         return AmqpExchangeType.TOPIC.equals(retrieveAmqpExchange().amqpExchangeType());
     }
 
     private MessagePostProcessor retrieveMessagePostProcessor(final T message) {
         MessagePostProcessor messagePostProcessor = new DefaultMessagePostProcessor(message);
-        if(hasDelay()){
+        if (hasDelay()) {
             messagePostProcessor = new DelayedMessagePostProcessor(amqpProducerMetadata.delayTimeInMillis());
         }
         return messagePostProcessor;
@@ -129,30 +140,31 @@ public abstract class AmqpRabbitProducer<T> {
                 .map(q -> new Queue(q))
                 .collect(Collectors.toList())
                 .stream()
-                .map(q -> BindingBuilder.bind(q).to(exchangeTopic).with(AmqpExchangeFactory.retrieveExchangeRoutingKeyGenericToTopic()).noargs())
+                .map(q -> BindingBuilder.bind(q).to(exchangeTopic)
+                        .with(AmqpExchangeFactory.retrieveExchangeRoutingKeyGenericToTopic()).noargs())
                 .collect(Collectors.toList());
     }
 
-
     private List<String> retrieveQueueNames() {
         final List<String> queueNames = new ArrayList<>();
-        final String[] names = retrieveAmqpQueue().name().split(" and ");
-        if(names != null){
+        final String[] names = AmqpQueueFactory.retrieveQueueName(retrieveAmqpQueue()).split(" and ");
+        if (names != null) {
             queueNames.addAll(Arrays.asList(names));
         }
         return queueNames;
     }
 
-    private void declare(Exchange exchange, Exchange exchangeDlq, Queue queue, Queue dlqQueue, Queue waitingQueue, List<Binding> bindings) {
-        try{
+    private void declare(Exchange exchange, Exchange exchangeDlq, Queue queue, Queue dlqQueue, Queue waitingQueue,
+            List<Binding> bindings) {
+        try {
             declareQueue(queue);
             declareQueue(dlqQueue);
             declareQueue(waitingQueue);
             rabbitAdmin.declareExchange(exchange);
             rabbitAdmin.declareExchange(exchangeDlq);
             bindings.stream()
-                .forEach(b -> rabbitAdmin.declareBinding(b));
-        }catch (Exception e){
+                    .forEach(b -> rabbitAdmin.declareBinding(b));
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -174,10 +186,14 @@ public abstract class AmqpRabbitProducer<T> {
         }
     }
 
-    private List<Binding> doBindings(Exchange exchange, Exchange exchangeDlq, Queue queue, Queue dlqQueue, Queue waitingQueue) {
-        final Binding bindingExchangeToQueue = BindingBuilder.bind(queue).to(exchange).with(AmqpExchangeFactory.retrieveExchangeRoutingKey(queue.getName())).noargs();
-        final Binding bindingExchangeToDlqQueue = BindingBuilder.bind(dlqQueue).to(exchangeDlq).with(AmqpExchangeFactory.retrieveExchangeDlqRoutingKey(queue.getName())).noargs();
-        final Binding bindingExchangeToWaitingQueue = BindingBuilder.bind(waitingQueue).to(exchange).with(AmqpExchangeFactory.retrieveExchangeWaitingRoutingKey(queue.getName())).noargs();
+    private List<Binding> doBindings(Exchange exchange, Exchange exchangeDlq, Queue queue, Queue dlqQueue,
+            Queue waitingQueue) {
+        final Binding bindingExchangeToQueue = BindingBuilder.bind(queue).to(exchange)
+                .with(AmqpExchangeFactory.retrieveExchangeRoutingKey(queue.getName())).noargs();
+        final Binding bindingExchangeToDlqQueue = BindingBuilder.bind(dlqQueue).to(exchangeDlq)
+                .with(AmqpExchangeFactory.retrieveExchangeDlqRoutingKey(queue.getName())).noargs();
+        final Binding bindingExchangeToWaitingQueue = BindingBuilder.bind(waitingQueue).to(exchange)
+                .with(AmqpExchangeFactory.retrieveExchangeWaitingRoutingKey(queue.getName())).noargs();
         return Arrays.asList(bindingExchangeToQueue, bindingExchangeToDlqQueue, bindingExchangeToWaitingQueue);
     }
 
@@ -194,13 +210,13 @@ public abstract class AmqpRabbitProducer<T> {
     }
 
     private Exchange createExchange() {
-        switch (retrieveAmqpExchange().amqpExchangeType()){
-            case DIRECT:
-                return AmqpExchangeFactory.buildDirectExchange(amqpProducerMetadata);
-            case TOPIC:
-                return AmqpExchangeFactory.buildTopicExchange(amqpProducerMetadata);
-            default:
-                throw new RuntimeException("Fail from createExchange. No type defined.");
+        switch (retrieveAmqpExchange().amqpExchangeType()) {
+        case DIRECT:
+            return AmqpExchangeFactory.buildDirectExchange(amqpProducerMetadata);
+        case TOPIC:
+            return AmqpExchangeFactory.buildTopicExchange(amqpProducerMetadata);
+        default:
+            throw new RuntimeException("Fail from createExchange. No type defined.");
         }
     }
 
@@ -208,11 +224,11 @@ public abstract class AmqpRabbitProducer<T> {
         return AmqpExchangeFactory.buildDirectDlqExchange(amqpProducerMetadata);
     }
 
-    private AmqpQueue retrieveAmqpQueue(){
+    private AmqpQueue retrieveAmqpQueue() {
         return amqpProducerMetadata.amqpQueue();
     }
 
-    private AmqpExchange retrieveAmqpExchange(){
+    private AmqpExchange retrieveAmqpExchange() {
         return amqpProducerMetadata.amqpExchange();
     }
 
@@ -221,5 +237,6 @@ public abstract class AmqpRabbitProducer<T> {
     }
 
     public abstract void beforeSend(final T message);
+
     public abstract void afterSend(final T message);
 }

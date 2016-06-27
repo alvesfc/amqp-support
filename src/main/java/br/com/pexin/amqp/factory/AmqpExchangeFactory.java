@@ -15,44 +15,47 @@ public class AmqpExchangeFactory {
     public static String retrieveExchangeName(final String queueName, AmqpExchangeType amqpExchangeType){
         switch (amqpExchangeType){
             case DIRECT:
-                return new StringBuilder(queueName).append(".direct").toString();
+                return new StringBuilder(queueName).append(".").append("direct").toString();
             case TOPIC:
-                return new StringBuilder(queueName).append(".topic").toString();
+                return new StringBuilder(queueName).append(".").append("topic").toString();
             default:
                 throw new RuntimeException("Fail from retrieveExchangeName.");
         }
     }
 
     public static String retrieveDlqExchangeName(final String queueName){
-        return new StringBuilder(queueName).append(".direct.dlq").toString();
+        return new StringBuilder(queueName).append(".").append("direct").append(".").append("dlq").toString();
     }
 
     public static String retrieveExchangeDlqRoutingKey(final String queueName){
-        return new StringBuilder(queueName).append(".dlq.key").toString();
+        return new StringBuilder(queueName).append(".").append("dlq").append(".").append("key").toString();
     }
 
     public static String retrieveExchangeRoutingKey(final String queueName){
-        return new StringBuilder(queueName).append(".key").toString();
+        return new StringBuilder(queueName).append(".").append("key").toString();
     }
 
     public static String retrieveExchangeWaitingRoutingKey(final String queueName){
-        return new StringBuilder(queueName).append(".waiting.key").toString();
+        return new StringBuilder(queueName).append(".").append("waiting").append(".").append("key").toString();
     }
 
     public static Exchange buildDirectExchange(AmqpProducer amqpProducer) {
-        final String exchangeName = retrieveExchangeName(amqpProducer.amqpQueue().name(), amqpProducer.amqpExchange().amqpExchangeType());
+        final String queueName = AmqpQueueFactory.retrieveQueueName(amqpProducer.amqpQueue());
+        final String exchangeName = retrieveExchangeName(queueName, amqpProducer.amqpExchange().amqpExchangeType());
         final AmqpExchange amqpExchange = amqpProducer.amqpExchange();
         return new DirectExchange(exchangeName, amqpExchange.durable(), amqpExchange.autoDelete());
     }
 
     public static Exchange buildTopicExchange(AmqpProducer amqpProducer) {
-        final String exchangeName = retrieveExchangeName(amqpProducer.amqpQueue().name(), amqpProducer.amqpExchange().amqpExchangeType());
+        final String queueName = AmqpQueueFactory.retrieveQueueName(amqpProducer.amqpQueue());
+        final String exchangeName = retrieveExchangeName(queueName, amqpProducer.amqpExchange().amqpExchangeType());
         final AmqpExchange amqpExchange = amqpProducer.amqpExchange();
         return new TopicExchange(exchangeName, amqpExchange.durable(), amqpExchange.autoDelete());
     }
 
     public static Exchange buildDirectDlqExchange(AmqpProducer amqpProducer) {
-        final String exchangeName = retrieveDlqExchangeName(amqpProducer.amqpQueue().name());
+        final String queueName = AmqpQueueFactory.retrieveQueueName(amqpProducer.amqpQueue());
+        final String exchangeName = retrieveDlqExchangeName(queueName);
         final AmqpExchange amqpExchange = amqpProducer.amqpExchange();
         return new DirectExchange(exchangeName, amqpExchange.durable(), amqpExchange.autoDelete());
     }
